@@ -13,7 +13,7 @@ from Utils.DocxGenerator import DocxGenerator
 from Utils.FAWidgets import CustomButton, CustomComboBox, CustomLineEdit, DicViewer
 from Utils.FontManager import FontSettingsWindow
 from Utils.FuriganaManager import (
-	AutoDivisionChoiceOverflowError, Term, Token0, Token1, Token2
+	AutoDivisionChoiceOverflowError, AutoDivisionDisabledError, Term, Token0, Token1, Token2
 )
 from Utils.Navigation import NavigationManager
 
@@ -60,6 +60,7 @@ class FindWindow(QWidget):
 			user_id = int(index)
 			if self.dic_viewer.remove_term_by_id(user_id): 
 				self.info.setText(f"Term with ID {user_id} has been deleted. ")
+				self.dic_viewer.save()
 			else: 
 				self.info.setText(f"No term with ID {user_id} found. ")
 		else:
@@ -95,7 +96,7 @@ class NewTermWindow(QWidget):
 		self.add_button = CustomButton(5, 0, "Add", self._nav_manager, self)
 		self.info = QTextEdit("", self)
 
-		self.type_input.addItems(["名詞", "五段", "上下", "形容", "英語", "サ変", "カ変"])
+		self.type_input.addItems(["名詞", "五段", "上下", "形容", "英語", "固有", "サ変", "カ変"])
 		self.pri_input.addItems(["0", "1", "2"])
 		self.info.setReadOnly(True)
 
@@ -129,7 +130,7 @@ class NewTermWindow(QWidget):
 		term_type = self.type_input.currentText()
 		try:
 			result_list = Term.auto_divide(jp, kana, term_type)
-		except AutoDivisionChoiceOverflowError as e:
+		except (AutoDivisionChoiceOverflowError, AutoDivisionDisabledError) as e:
 			self.info.setText(str(e))
 			self.current_auto_div_results = []
 			self.auto_div_selections.clear()

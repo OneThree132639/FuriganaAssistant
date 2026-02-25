@@ -8,6 +8,12 @@ from typing import (
 	Callable, Collection, Generator, List, Literal, Optional, Tuple
 )
 
+class MultipleGobiError(Exception): 
+	pass
+
+class AutoDivisionDisabledError(Exception): 
+	pass
+
 class AutoDivisionChoiceOverflowError(Exception): 
 	pass
 
@@ -42,15 +48,19 @@ class Token2:
 class Term: 
 
 	PATTERNS = {
-		"remove_gobi": re.compile("^(.+)\\*.*$"), 
-		"is_gobi_exists": re.compile("^.+\\*.+$"), 
-		"get_gobi": re.compile("^.+\\*(.*)$"), 
-
+		"remove_gobi": re.compile("^(.+)(?<!\\$)\\*.*$"), 
+		"is_gobi_exists": re.compile("^.+(?<!\\$)(\\*).+$"), 
+		"get_gobi": re.compile("^.+(?<!\\$)\\*(.*)$"), 
+		"div_remove_/": re.compile("(?<!\\$)/"), 
+		"div_remove_\\": re.compile("(?<!\\$)\\\\"), 
+		"div_remove_*": re.compile("(?<!\\$)\\*"), 
+		"div_split_/": re.compile("(?<!\\$)/"), 
+		"div_split_\\": re.compile("(?<!\\$)\\\\"),
+		"div_split_*": re.compile("(?<!\\$)\\*")
 	}
 
 	def __init__(self, japanese: str, kana: str, 
 			div0: str, div1: str, term_type: str, priority: int, 
-			is_kana_check: bool = True
 		): 
 		self.jp = japanese
 		self.kana = kana
@@ -58,21 +68,67 @@ class Term:
 		self.div1 = div1
 		self.term_type = term_type
 		self.pri = priority
-		if not self.is_valid(0, is_kana_check) or not self.is_valid(1, is_kana_check): 
+		if not self.is_valid(0) or not self.is_valid(1): 
 			raise ValueError((
 				"[Term] Illegal values to create a Term object: "
 				"{}. "
 			).format(self))
+		
+	@classmethod
+	def is_valid_transfer(cls, origin_str) -> bool: 
+		i = 0
+		while i < len(origin_str): 
+			if origin_str[i] == "$": 
+				if i + 1 < len(origin_str) and origin_str[i + 1] in ("/", "\\", "*", "$"): 
+					i += 2
+				else: 
+					return False
+			i += 1
+		return True
+		
+	@classmethod	
+	def div_remove(cls, origin_str: str, div_char: Literal["/", "\\", "*"]) -> str: 
+		pattern = Term.PATTERNS["div_remove_{}".format(div_char)]
+		return re.sub(pattern, "", origin_str)
+	
+	@classmethod
+	def div_split(cls, origin_str: str, div_char: Literal["/", "\\", "*"]) -> List[str]: 
+		pattern = Term.PATTERNS["div_split_{}".format(div_char)]
+		return re.split(pattern, origin_str)
+	
+	@classmethod
+	def is_jp_str(cls, s: str) -> bool: 
+		for c in s: 
+			if (
+				not Term.is_cjk_unified(c) and not Term.is_kana(c) and 
+				not str.isdigit(c) and not c in (".", "-", "+")
+			): 
+				return False
+		return True
+	
+	@classmethod
+	def is_jp_valid_str(cls, s: str) -> bool: 
+		for c in s: 
+			if not Term.is_jp_str(c) and not c in ("/", "\\", "*"): 
+				return False
+		return True
 
-	def is_valid(self, div_type: Literal[0, 1], is_kana_check: bool) -> bool: 
-		div_char = ["/", "\\"]
+	def is_valid(self, div_type: Literal[0, 1]) -> bool: 
+		if not all(Term.is_valid_transfer(s) for s in (self.jp, self.kana, self.div0, self.div1)): 
+			return False
+		
+		if self.term_type not in ("英語", "固有"):
+			if not all(Term.is_jp_valid_str(s) for s in (self.jp, self.kana)): 
+				return False
+
+		div_char = ("/", "\\")
 		div = [self.div0, self.div1]
-		jp = self.jp.replace(div_char[1 - div_type], "")
-		kana = self.kana.replace(div_char[1 - div_type], "")
-		division = div[div_type].replace(div_char[1 - div_type], "")
+		jp = Term.div_remove(self.jp, div_char[1 - div_type])
+		kana = Term.div_remove(self.kana, div_char[1 - div_type])
+		division = Term.div_remove(div[div_type], div_char[1 - div_type])
 
 		gobi_exists = [self.is_gobi_exists(jp), self.is_gobi_exists(kana), self.is_gobi_exists(division)]
-		if self.term_type == "名詞": 
+		if self.term_type in ("名詞", "固有"): 
 			if any(gobi_exists): 
 				logging.warning((
 					"[Term.is_valid] Type is \"名詞\" while gobi exists. "
@@ -101,9 +157,15 @@ class Term:
 					"[Term.is_valid] Type with katsuyou while at least one gobi doesn't exist. " 
 				))
 				return False
-			jp_gobi = self.get_gobi(jp)
-			kana_gobi = self.get_gobi(kana)
-			division_gobi = self.get_gobi(division)
+			try: 
+				jp_gobi = self.get_gobi(jp)
+				kana_gobi = self.get_gobi(kana)
+				division_gobi = self.get_gobi(division)
+			except MultipleGobiError: 
+				logging.warning((
+					"[Term.is_valid] Multiple gobi in one of jp, kana, division. "
+				))
+				return False
 			if (jp_gobi != kana_gobi or division_gobi != "-1"): 
 				logging.warning((
 					"[Term.is_valid] Gobi doesn't match. "
@@ -143,9 +205,9 @@ class Term:
 			kana = self.remove_gobi(kana)
 			division = self.remove_gobi(division)
 
-		jp_list = jp.split(div_char[div_type])
-		kana_list = kana.split(div_char[div_type])
-		div_list = division.split(div_char[div_type])
+		jp_list = Term.div_split(jp, div_char[div_type])
+		kana_list = Term.div_split(kana, div_char[div_type])
+		div_list = Term.div_split(division, div_char[div_type])
 		if len(jp_list) != len(kana_list) or len(jp_list) != len(div_list): 
 			logging.warning((
 				"[Term.is_valid] Length of jp, kana, division are not equal. \n"
@@ -158,7 +220,7 @@ class Term:
 			div_elem = div_list[i]
 			is_all_kana = all([self.is_kana(c) for c in jp_elem])
 			is_not_all_kana = all([not self.is_kana(c) for c in jp_elem])
-			if is_kana_check: 
+			if self.term_type != "固有": 
 				if is_all_kana: 
 					if is_not_all_kana: 
 						logging.warning((
@@ -173,7 +235,7 @@ class Term:
 							return False
 				else: 
 					if is_not_all_kana: 
-						if not div_elem.isdecimal() or int(div_elem) not in [0, 1, 2]: 
+						if div_elem not in ("0", "1", "2"): 
 							logging.warning((
 								"[Term.is_valid] Division is not valid. "
 							))
@@ -184,7 +246,7 @@ class Term:
 						))
 						return False
 			else: 
-				if not div_elem.isdecimal() or int(div_elem) not in [-1, 0, 1, 2]: 
+				if div_elem not in ("-1", "0", "1", "2"): 
 					logging.warning((
 						"[Term.is_valid] Division is not valid. "
 					))
@@ -230,9 +292,10 @@ class Term:
 
 	@classmethod
 	def remove_seps(cls, origin_str: str) -> str: 
-		origin_str = origin_str.replace("/", "")
-		origin_str = origin_str.replace("\\", "")
-		origin_str = origin_str.replace("*", "")
+		for div_char in ("/", "\\", "*"): 
+			origin_str = Term.div_remove(origin_str, div_char)
+		for trans_str, trans_obj in (("${}".format(c), c) for c in ("/", "\\", "*", "$")): 
+			origin_str = origin_str.replace(trans_str, trans_obj)
 		return origin_str
 	
 	@classmethod
@@ -241,13 +304,28 @@ class Term:
 		result = re.match(pattern, origin_str)
 		if result is None:
 			return origin_str
+		if result.lastindex is not None and result.lastindex > 1: 
+			raise MultipleGobiError((
+				"[Term.get_gobi] This str {} has more than one gobi(seperated by \"*\"). "
+			).format(origin_str))
 		return result.group(1)
 	
 	@classmethod
 	def is_gobi_exists(cls, origin_str: str) -> bool: 
 		pattern = Term.PATTERNS["is_gobi_exists"]
 		result = re.match(pattern, origin_str)
-		return result is not None
+		if result is None: 
+			return False
+		else: 
+			if result.lastindex is None:
+				raise ValueError((
+					"[Term.is_gobi_exists] result.lastindex is None. "
+				).format(origin_str))
+			elif result.lastindex > 1: 
+				raise MultipleGobiError((
+					"[Term.get_gobi] This str {} has more than one gobi(seperated by \"*\"). "
+				).format(origin_str))
+			return True
 	
 	@classmethod
 	def get_gobi(cls, origin_str: str) -> str: 
@@ -257,12 +335,21 @@ class Term:
 			raise ValueError((
 				"[Term.get_gobi] This str {} has no gobi(seperated by \"*\"). "
 			).format(origin_str))
+		if result.lastindex is not None and result.lastindex > 1: 
+			raise MultipleGobiError((
+				"[Term.get_gobi] This str {} has more than one gobi(seperated by \"*\"). "
+			).format(origin_str))
 		return result.group(1)
 
 	def re_pattern(self) -> str: 
 		match self.term_type: 
 			case "名詞": 
 				return "^({})(.*)$".format(self.remove_seps(self.jp))
+			case "固有": 
+				s = self.remove_seps(self.jp)
+				for dec_c in ("\\", "$", "(", ")", "*", "?", "+", ".", "[", "]", "{", "}", "|", "^"): 
+					s = s.replace(dec_c, "\\{}".format(dec_c))
+				return "^({})(.*)$".format(s)
 			case "五段": 
 				gobi_dic = {
 					"う": ["わ", "い", "う", "え", "お", "っ"], 
@@ -307,30 +394,36 @@ class Term:
 		).format(self.jp, self.kana, self.div0, self.div1, self.term_type, self.pri)
 	
 	def pre_to_token(self, origin_str: str, div_type: Literal[0, 1, 2]) -> Tuple[List[str], List[str], List[str], str]: 
-		div_char = ["/", "\\", "\\"][div_type]
-		needless_div_char = ["\\", "/", "/"][div_type]
+		div_char = ("/", "\\", "\\")[div_type]
+		needless_div_char = ("\\", "/", "/")[div_type]
 		div = [self.div0, self.div1, self.div1][div_type]
-		jp = self.jp.replace(needless_div_char, "")
-		kana = self.kana.replace(needless_div_char, "")
-		division = div.replace(needless_div_char, "")
+		jp = Term.div_remove(self.jp, needless_div_char)
+		kana = Term.div_remove(self.kana, needless_div_char)
+		division = Term.div_remove(div, needless_div_char)
 
 		jp_gokan = self.remove_gobi(jp)
 		kana_gokan = self.remove_gobi(kana)
 		div_gokan = self.remove_gobi(division)
 
-		pattern = "^({})\\*?(.*)$".format(self.remove_seps(jp_gokan))
 		if self.term_type == "英語": 
 			letter_list = ["[{}{}]".format(c.lower(), c.upper()) for c in jp_gokan]
 			pattern = "^({})(.*)$".format(str.join("", letter_list))
+		elif self.term_type == "固有": 
+			s = Term.remove_seps(jp_gokan)
+			for dec_c in ("\\", "$", "(", ")", "*", "?", "+", ".", "[", "]", "{", "}", "|", "^"): 
+				s = s.replace(dec_c, "\\{}".format(dec_c))
+			pattern = "^({})(.*)$".format(s)
+		else: 
+			pattern = "^({})\\*?(.*)$".format(self.remove_seps(jp_gokan))
 		result = re.match(pattern, origin_str)
 		if result is None: 
 			raise ValueError((
 				"[Term.to_token] The origin_str: {} does not match the jp part of this term: {}. "
 			).format(origin_str, self.jp))
-		leftover = result.group(2)
-		jp_list = jp_gokan.split(div_char) if self.term_type != "英語" else result.group(1).split(div_char)
-		kana_list = kana_gokan.split(div_char)
-		div_list = div_gokan.split(div_char)
+		leftover = result.group(2) 
+		jp_list = Term.div_split(jp_gokan, div_char) if self.term_type != "英語" else Term.div_split(result.group(1), div_char)
+		kana_list = Term.div_split(kana_gokan, div_char)
+		div_list = Term.div_split(div_gokan, div_char)
 		return (jp_list, kana_list, div_list, leftover)
 	
 	def to_token0(self, origin_str: str) -> List[Token0]: 
@@ -339,11 +432,15 @@ class Term:
 
 		for i in range(len(jp_list)): 
 			if int(div_list[i]) in [0, 1, 2]: 
-				tokens.append(Token0(jp_list[i], kana_list[i], int(div_list[i])))
+				tokens.append(Token0(
+					Term.remove_seps(jp_list[i]), 
+					Term.remove_seps(kana_list[i]), 
+					int(div_list[i])
+				))
 			else: 
-				tokens.append(Token0(jp_list[i]))
+				tokens.append(Token0(Term.remove_seps(jp_list[i])))
 		if len(leftover) > 0:
-			tokens.append(Token0(leftover))
+			tokens.append(Token0(Term.remove_seps(leftover)))
 		return tokens
 	
 	def to_token1(self, origin_str: str) -> List[Token1]: 
@@ -354,16 +451,20 @@ class Term:
 		while i < len(jp_list): 
 			if int(div_list[i]) == 0: 
 				if i + 1 < len(jp_list) and int(div_list[i + 1]) == 0: 
-					tokens.append(Token1(jp_list[i] + jp_list[i + 1], kana_list[i], kana_list[i + 1]))
+					tokens.append(Token1(
+						Term.remove_seps(jp_list[i] + jp_list[i + 1]), 
+						Term.remove_seps(kana_list[i]), 
+						Term.remove_seps(kana_list[i + 1])
+					))
 					i += 2
 				else: 
-					tokens.append(Token1(jp_list[i], kana_list[i]))
+					tokens.append(Token1(Term.remove_seps(jp_list[i]), Term.remove_seps(kana_list[i])))
 					i += 1
 			else: 
-				tokens.append(Token1(jp_list[i]))
+				tokens.append(Token1(Term.remove_seps(jp_list[i])))
 				i += 1
 		if len(leftover) > 0:
-			tokens.append(Token1(leftover))
+			tokens.append(Token1(Term.remove_seps(leftover)))
 		return tokens
 	
 	def to_token2(self, origin_str: str) -> List[Token2]: 
@@ -377,7 +478,10 @@ class Term:
 		while i < len(jp_list): 
 			if int(div_list[i]) != current_div: 
 				if len(current_jp) != 0: 
-					tokens.append(Token2(current_jp, current_kana) if current_div == 0 else Token2(current_jp))
+					tokens.append(
+						Token2(Term.remove_seps(current_jp), Term.remove_seps(current_kana)) 
+						if current_div == 0 else Token2(Term.remove_seps(current_jp))
+					)
 				current_div = div_list[i]
 				current_jp = jp_list[i]
 				current_kana = kana_list[i]
@@ -387,9 +491,12 @@ class Term:
 				current_kana += kana_list[i]
 			i += 1
 		if len(current_jp) != 0: 
-			tokens.append(Token2(current_jp, current_kana) if current_div == 0 else Token2(current_jp))
+			tokens.append(
+				Token2(Term.remove_seps(current_jp), Term.remove_seps(current_kana)) 
+				if current_div == 0 else Token2(Term.remove_seps(current_jp))
+			)
 		if len(leftover) > 0: 
-			tokens.append(Token2(leftover))
+			tokens.append(Token2(Term.remove_seps(leftover)))
 		return tokens
 	
 	@classmethod
@@ -418,6 +525,11 @@ class Term:
 		# jp = "草臥れる", kana = "くたびれる", term_type = "上下"
 		if len(jp) == 0 or len(kana) == 0: 
 			return None
+		if term_type not in ("英語", "固有") and not all(Term.is_jp_str(s) for s in (jp, kana)): 
+			raise AutoDivisionDisabledError((
+				"Unused character in Japanese found while the term_type is not \"固有\" or \"英語\". \n"
+				"Auto division is disabled. "
+			))
 		if term_type == "五段": 
 			gobi_list = ["う", "く", "ぐ", "す", "つ", "ぬ", "ぶ", "む", "る"]
 			if jp[-1] != kana[-1] or jp[-1] not in gobi_list: 
@@ -446,6 +558,15 @@ class Term:
 		elif term_type == "名詞": 
 			jp_list = [jp, None]
 			kana_list = [kana, None]
+		elif term_type == "固有": 
+			if not all(Term.is_jp_str(s) for s in (jp, kana)): 
+				raise AutoDivisionDisabledError((
+					"Unused character in Japanese found while the term_type is \"固有\". \n"
+					"Please manually divide the term. "
+				))
+			else: 
+				jp_list = [jp, None]
+				kana_list = [kana, None]
 		elif term_type == "英語": 
 			return [(jp, kana, "1", "0")]
 		else: 
@@ -585,7 +706,8 @@ class Term:
 			0x2CEB0 <= code <= 0x2EBEF or  # 扩展F
 			0x30000 <= code <= 0x3134F or  # 扩展G
 			0x31350 <= code <= 0x323AF or  # 扩展H
-			0x2EBF0 <= code <= 0x2EE5F      # 扩展I (Unicode 15.1+)
+			0x2EBF0 <= code <= 0x2EE5F or  # 扩展I (Unicode 15.1+)
+			code == 0x3005
 		)
 	
 	@classmethod
@@ -778,7 +900,7 @@ class Dictionary:
 				args = [custom_result.group(i) for i in range(1, 5)]
 				remaining_line = custom_result.group(5)
 				try: 
-					term = Term(args[0], args[1], args[2], args[3], "名詞", 0, False)
+					term = Term(args[0], args[1], args[2], args[3], "固有", 0)
 					tokens.extend(term.to_token0(Term.remove_seps(term.jp)))
 					continue
 				except: 
@@ -818,7 +940,7 @@ class Dictionary:
 				args = [custom_result.group(i) for i in range(1, 5)]
 				remaining_line = custom_result.group(5)
 				try:
-					term = Term(args[0], args[1], args[2], args[3], "名詞", 0, False)
+					term = Term(args[0], args[1], args[2], args[3], "固有", 0)
 					tokens.extend(term.to_token1(Term.remove_seps(term.jp)))
 					continue
 				except:
@@ -858,7 +980,7 @@ class Dictionary:
 				args = [custom_result.group(i) for i in range(1, 5)]
 				remaining_line = custom_result.group(5)
 				try: 
-					term = Term(args[0], args[1], args[2], args[3], "名詞", 0, False)
+					term = Term(args[0], args[1], args[2], args[3], "固有", 0)
 					tokens.extend(term.to_token2(Term.remove_seps(term.jp)))
 					continue
 				except Exception as e: 
@@ -933,7 +1055,9 @@ if __name__ == "__main__":
 	)
 	DIRPATH = get_config_dir("FuriganaAssistant")
 
-	jp = "謎試験問題"
-	kana = "なぞしけんもんだい"
+	text = "$歌$：初音ミク　$曲$：DECO*27"
 
-	
+	dic = Dictionary(str(DIRPATH / "dic.csv"))
+	token_list = dic.line_to_tokens2(text)
+	for token in token_list: 
+		print(token.jp, token.kana)
