@@ -29,18 +29,18 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --clean ^
-            --onefile ^
-            --windowed ^
-            --name="Furigana Assistant" ^
-            --icon="resources/favicon.ico" ^
+          pyinstaller --clean `
+            --onefile `
+            --windowed `
+            --name="Furigana Assistant" `
+            --icon="resources/favicon.ico" `
             main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Furigana-Assistant-Windows
-          path: dist/Furigana Assistant.exe
+          path: Furigana Assistant.exe
 
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/')
