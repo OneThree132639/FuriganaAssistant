@@ -1,0 +1,51 @@
+# .github/workflows/build-windows.yml
+
+name: Build Windows Executable
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: 
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean ^
+            --onefile ^
+            --windowed ^
+            --name="Furigana Assistant" ^
+            --icon="resources/favicon.ico" ^
+            main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Furigana-Assistant-Windows
+          path: dist/Furigana Assistant.exe
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "dist/Furigana Assistant.exe"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
