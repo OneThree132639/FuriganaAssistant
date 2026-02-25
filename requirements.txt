@@ -1,0 +1,14 @@
+# GUI
+PyQt5
+
+# Fonts
+fontTools
+matplotlib
+
+# Data
+numpy
+pandas
+
+# docx
+lxml
+python-docx

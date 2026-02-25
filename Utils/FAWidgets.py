@@ -1,6 +1,5 @@
 import logging
 
-from abc import ABC
 from PyQt5.QtCore import QEvent, QObject, Qt
 from PyQt5.QtGui import (
 	QFocusEvent, QKeyEvent, QResizeEvent, 

@@ -37,3 +37,4 @@ env/
 
 # custom files
 build_dmg.sh
+dmg/
