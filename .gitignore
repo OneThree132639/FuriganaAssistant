@@ -34,3 +34,6 @@ env/
 .vscode/
 .idea/
 *.swp
+
+# custom files
+build_dmg.sh
