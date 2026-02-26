@@ -150,7 +150,7 @@ class NewTermWindow(QWidget):
 		self.current_auto_div_results = valid_result_list
 		self.auto_div_selections.clear()
 		self.auto_div_selections.addItems([
-			"Japanese: {}, Kana: {}, Division0: {}, Division1: {}".format(
+			"Jp: {}, Kn: {}, D0: {}, D1: {}".format(
 				result[0], result[1], result[2], result[3]
 			) for result in valid_result_list
 		])
@@ -415,7 +415,6 @@ class MainWindow(QMainWindow):
 				else: 
 					docx_gen.add_field0(token.jp, token.kana, token.alignment)
 			docx_gen.add_paragraph()
-		docx_gen.set_columns(2)
 		docx_gen.save(output_path)
 
 	def output_docx_1(self, text: str, output_path: str) -> None: 
@@ -437,7 +436,6 @@ class MainWindow(QMainWindow):
 				elif token.up_kana is not None: 
 					docx_gen.add_field1(token.jp, token.up_kana, token.down_kana)
 			docx_gen.add_paragraph()
-		docx_gen.set_columns(2)
 		docx_gen.save(output_path)
 
 	def output_docx_2(self, text: str, output_path: str) -> None: 
@@ -456,7 +454,6 @@ class MainWindow(QMainWindow):
 				else: 
 					docx_gen.add_run("{}({})".format(token.jp, token.kana))
 			docx_gen.add_paragraph()
-		docx_gen.set_columns(2)
 		docx_gen.save(output_path)
 	
 	def update_output_text(self) -> None: 

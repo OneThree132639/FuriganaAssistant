@@ -122,7 +122,7 @@ class FontSettingsWindow(QWidget):
 		self.show_label = QLabel("Show Window: ", self)
 		self.test_type_label = QLabel("Test Type: ", self)
 		self.test_type_box = QComboBox(self)
-		self.show_window = QTextEdit("", self)
+		self.show_window = QTextEdit("暂不可用", self)
 
 		self.test_text.setText("例文")
 		self.test_furigana_text.setText("れいぶん")

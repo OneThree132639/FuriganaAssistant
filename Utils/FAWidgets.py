@@ -1,13 +1,13 @@
 import logging
 
-from PyQt5.QtCore import QEvent, QObject, Qt
+from PyQt5.QtCore import QEvent, QModelIndex, QObject, QSize, Qt
 from PyQt5.QtGui import (
-	QFocusEvent, QKeyEvent, QResizeEvent, 
+	QFocusEvent, QFontMetrics, QKeyEvent, QResizeEvent, 
 	QStandardItem, QStandardItemModel
 )
 from PyQt5.QtWidgets import (
-	QComboBox, QGridLayout, QHeaderView, QLineEdit, 
-	QPushButton, QTableView, QWidget
+	QAbstractItemView, QComboBox, QGridLayout, QHeaderView, QLineEdit, 
+	QPushButton, QStyledItemDelegate, QStyleOptionViewItem, QTableView, QWidget
 )
 from typing import Callable, Dict, Optional
 
@@ -335,6 +335,39 @@ class PopUpKeyFilter(QObject):
 			view.setCurrentIndex(model.index((current + 1) % combo.count(), 0))
 			return True
 		return False
+	
+class ScrollableElideDelegate(QStyledItemDelegate): 
+	def __init__(
+			self, 
+			parent: Optional[QWidget] = None, 
+			elide_mode: Qt.TextElideMode = Qt.TextElideMode.ElideRight, 
+			enable_scroll: bool = False
+		): 
+		super().__init__(parent)
+		self._elide_mode = elide_mode
+		self._enable_scroll = enable_scroll
+
+	def initStyleOption(self, 
+			option: QStyleOptionViewItem, 
+			index: QModelIndex
+		) -> None:
+		super().initStyleOption(option, index)
+		option.textElideMode = self._elide_mode
+		if self._enable_scroll: 
+			option.textElideMode = Qt.TextElideMode.ElideNone
+
+	def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize: 
+		size = super().sizeHint(option, index)
+		if self._enable_scroll: 
+			text = index.data(Qt.ItemDataRole.DisplayRole)
+			if text is not None: 
+				font = option.font
+				metrics = QFontMetrics(font)
+				text_width = metrics.horizontalAdvance(text) + 20
+				size.setWidth(max(size.width(), text_width))
+
+		return size
+		
 
 class CustomComboBox(QComboBox): 
 
@@ -362,6 +395,24 @@ class CustomComboBox(QComboBox):
 			self.setEditable(False)
 
 		self._popup_filter_installed = False
+
+		# self._set_delegate()
+
+	def _set_delegate(self) -> None: 
+		self._delegate = ScrollableElideDelegate(
+			self, elide_mode=Qt.TextElideMode.ElideRight, enable_scroll=True
+		)
+		view = self.view()
+		if view is not None: 
+			self._apply_view_settings(view)
+		else: 
+			pass
+
+	def _apply_view_settings(self, view: QAbstractItemView) -> None: 
+		view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+		view.setItemDelegate(self._delegate)
+		view.setMaximumWidth(600)
+
 
 	def keyPressEvent(self, event: QKeyEvent) -> None: 
 
@@ -459,15 +510,21 @@ class CustomComboBox(QComboBox):
 		self.hidePopup()
 
 	def showPopup(self) -> None: 
-		if not self._popup_filter_installed: 
-			view = self.view()
-			if view is not None: 
+		view = self.view()
+		if view is not None: 
+			if not self._popup_filter_installed: 
 				view.installEventFilter(PopUpKeyFilter(self))
 				self._popup_filter_installed = True
 				logging.debug((
 					"[CustomComboBox.showPopUp] "
 					"Filter installed for combo: {}. "
 				).format(id(self)))
+
+			'''
+			view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+			view.setItemDelegate(self._delegate)
+			view.updateGeometry()
+			'''
 		
 		super().showPopup()
 				
