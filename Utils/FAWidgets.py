@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 
 from PyQt5.QtCore import QEvent, QModelIndex, QObject, QSize, Qt
 from PyQt5.QtGui import (
@@ -154,6 +155,15 @@ class DicViewer(QWidget):
 				final_midth = max(width, self._min_widths[col])
 				self.table_view.setColumnWidth(col, final_midth)
 
+	def merge(self, dic: pd.DataFrame) -> None: 
+		dic = Dictionary.check(dic)
+		for _, row in dic.iterrows(): 
+			term = Term(
+				row["Japanese"], row["Kana"], row["Division0"], 
+				row["Division1"], row["Type"], int(row["Priority"])
+			)
+			if not self.dic.is_exists(term): 
+				self.append_term(term)
 
 
 class CustomButton(QPushButton): 

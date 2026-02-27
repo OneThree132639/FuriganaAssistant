@@ -1,13 +1,15 @@
 import logging
 import json
 import os
+import pandas as pd
 import sys
 
+from pathlib import Path
 from PyQt5.QtWidgets import (
 	QAction, QApplication, QComboBox, QFileDialog, QGridLayout, QLabel, 
-	QMainWindow, QPushButton, QStackedWidget, QTextEdit, QWidget
+	QMainWindow, QMenu, QPushButton, QStackedWidget, QTextEdit, QWidget
 )
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from Utils.DocxGenerator import DocxGenerator
 from Utils.FAWidgets import CustomButton, CustomComboBox, CustomLineEdit, DicViewer
@@ -259,55 +261,47 @@ class MainWindow(QMainWindow):
 		if menu_bar is not None:
 			file_menu = menu_bar.addMenu("&File")
 			if file_menu is not None: 
-				read_txt_action = QAction("Read Text from .txt File", self)
-				if read_txt_action is not None: 
-					read_txt_action.setShortcut("Ctrl+O")
-					read_txt_action.setStatusTip(
-						"Read input text from a .txt file. "
-					)
-					read_txt_action.triggered.connect(self.read_txt_func)
-					file_menu.addAction(read_txt_action)
-					file_menu.addSeparator()
-				save_docx0_action = QAction("Save as Docx (Type 0)", self)
-				if save_docx0_action is not None: 
-					save_docx0_action.setShortcut("Ctrl+0")
-					save_docx0_action.setStatusTip(
-						"Save the output text as a docx file with type 0 formatting. "
-					)
-					save_docx0_action.triggered.connect(
-						self.save_func_gen(self.output_docx_0, "docx")
-					)
-					file_menu.addAction(save_docx0_action)
-				save_docx1_action = QAction("Save as Docx (Type 1)", self)
-				if save_docx1_action is not None:
-					save_docx1_action.setShortcut("Ctrl+1")
-					save_docx1_action.setStatusTip(
-						"Save the output text as a docx file with type 1 formatting. "
-					)
-					save_docx1_action.triggered.connect(
-						self.save_func_gen(self.output_docx_1, "docx")
-					)
-					file_menu.addAction(save_docx1_action)
-				save_docx2_action = QAction("Save as Docx (Type 2)", self)
-				if save_docx2_action is not None:
-					save_docx2_action.setShortcut("Ctrl+2")
-					save_docx2_action.setStatusTip(
-						"Save the output text as a docx file with type 2 formatting. "
-					)
-					save_docx2_action.triggered.connect(
-						self.save_func_gen(self.output_docx_2, "docx")
-					)
-					file_menu.addAction(save_docx2_action)
-				save_txt_action = QAction("Save as Text", self)
-				if save_txt_action is not None:
-					save_txt_action.setShortcut("Ctrl+S")
-					save_txt_action.setStatusTip(
-						"Save the output text as a plain text file. "
-					)
-					save_txt_action.triggered.connect(
-						self.save_func_gen(self.output_txt, "txt")
-					)
-					file_menu.addAction(save_txt_action)
+				self._add_action(
+					file_menu, "Read Text from .txt File", "Ctrl+O", 
+					"Read input text from a .txt file. ", self.read_txt_func, True
+				)
+				self._add_action(
+					file_menu, "Save as Docx (Type 0)", "Ctrl+0", 
+					"Save the output text as a docx file with type 0 formatting. ", 
+					self.save_func_gen(self.output_docx_0, "docx")
+				)
+				self._add_action(
+					file_menu, "Save as Docx (Type 1)", "Ctrl+1", 
+					"Save the output text as a docx file with type 1 formatting. ", 
+					self.save_func_gen(self.output_docx_1, "docx")
+				)
+				self._add_action(
+					file_menu, "Save as Docx (Type 2)", "Ctrl+2", 
+					"Save the output text as a docx file with type 2 formatting. ", 
+					self.save_func_gen(self.output_docx_2, "docx")
+				)
+				self._add_action(
+					file_menu, "Save as Text", "Ctrl+S", 
+					"Save the output text as a plain text file. ", 
+					self.save_func_gen(self.output_txt, "txt"), True
+				)
+				self._add_action(
+					file_menu, "Merge new dic", "Ctrl+M", 
+					"Merge a data file into current local datas. ", self.merge
+				)
+
+	def _add_action(self, 
+			menu: QMenu, text: str, quick_key: str, status_tip: str, 
+			connect_func: Callable[[], None], is_separator: bool = False
+		) -> None: 
+		action = QAction(text, self)
+		if action is not None:
+			action.setShortcut(quick_key)
+			action.setStatusTip(status_tip)
+			action.triggered.connect(connect_func)
+			menu.addAction(action)
+			if is_separator: 
+				menu.addSeparator()
 
 
 	def add_page(self, row: int, col: int, button_widget: QPushButton, page_widget: QWidget) -> None: 
@@ -555,6 +549,38 @@ class MainWindow(QMainWindow):
 			"last_columns", 
 			str(self.font_settings_window.get_current_columns())
 		)
+
+	def merge(self) -> None: 
+		file_type = "Data Files (*.csv; *.xlsx; *.xls; *.json; *.h5; *.pkl)"
+		options = QFileDialog.Options()
+		file_path, _ = QFileDialog.getOpenFileName(
+			self, "Select Data File", self.get_config("last_open_path"), 
+			filter=file_type, options=options
+		)
+		if file_path: 
+			self.save_config("last_open_path", os.path.dirname(file_path))
+			try: 
+				suffix = Path(file_path).suffix
+				match suffix: 
+					case ".csv": 
+						df = pd.read_csv(file_path)
+					case ".txt": 
+						df = pd.read_csv(file_path, sep="\t", encoding="utf-8")
+					case ".xlsx" | ".xls": 
+						df = pd.read_csv(file_path)
+					case ".json": 
+						df = pd.read_json(file_path)
+					case _:
+						raise ValueError((
+							"File that can't be transferred to a pd.DataFrame object is chosen: {}. "
+						).format(file_path))
+				self.find_window.dic_viewer.merge(df)
+			except Exception as e: 
+				logging.error((
+					"[MainWindow.merge_csv] Unexpected error happenned: {} "
+					"while read data file: {}. "
+				).format(str(e)), file_path)
+				
 
 			
 

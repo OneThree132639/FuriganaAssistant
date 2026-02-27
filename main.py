@@ -17,6 +17,8 @@ def get_config_dir(app_name: str) -> Path:
 		return Path.home() / ".config" / app_name
 	
 if __name__ == "__main__": 
+
+	DIRPATH = os.path.dirname(os.path.realpath(__file__))
 	
 	logging.basicConfig(
 		level=logging.INFO, 
