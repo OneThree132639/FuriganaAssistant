@@ -393,7 +393,24 @@ class Term:
 			"term_type: {}, priority: {})"
 		).format(self.jp, self.kana, self.div0, self.div1, self.term_type, self.pri)
 	
+	def kahen_to_token(self, origin_str: str, div_type: Literal[0, 1, 2]) -> Tuple[List[str], List[str], List[str], str]: 
+		kahen_dic = {
+			"来る": "くる", "来ない": "こない", "来なく": "こなく", "来なかっ": "こなかっ", "来なければ": "こなければ", 
+			"来なさ": "きなさい", "来た": "きた", "来て": "きて", "来られ": "こられ", "来い": "こい", "来よ": "こよ"
+		}
+		for key, value in kahen_dic.items(): 
+			print("key: {}, value: {}".format(key, value))
+			if origin_str.startswith(key): 
+				return (
+					["来", key[1:]], [value[0], value[1:]], ["0", "-1"], origin_str[len(key):]
+				)
+		raise ValueError((
+			"[Term.kahen_to_token] The origin_str: {} does not match the jp part of this term: {}. "
+		).format(origin_str, self.jp))
+	
 	def pre_to_token(self, origin_str: str, div_type: Literal[0, 1, 2]) -> Tuple[List[str], List[str], List[str], str]: 
+		if self.term_type == "カ変": 
+			return self.kahen_to_token(origin_str, div_type)
 		div_char = ("/", "\\", "\\")[div_type]
 		needless_div_char = ("\\", "/", "/")[div_type]
 		div = [self.div0, self.div1, self.div1][div_type]
@@ -418,7 +435,7 @@ class Term:
 		result = re.match(pattern, origin_str)
 		if result is None: 
 			raise ValueError((
-				"[Term.to_token] The origin_str: {} does not match the jp part of this term: {}. "
+				"[Term.pre_to_token] The origin_str: {} does not match the jp part of this term: {}. "
 			).format(origin_str, self.jp))
 		leftover = result.group(2) 
 		jp_list = Term.div_split(jp_gokan, div_char) if self.term_type != "英語" else Term.div_split(result.group(1), div_char)

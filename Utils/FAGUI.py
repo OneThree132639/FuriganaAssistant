@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 from PyQt5.QtWidgets import (
 	QAction, QApplication, QComboBox, QFileDialog, QGridLayout, QLabel, 
-	QMainWindow, QMenu, QPushButton, QStackedWidget, QTextEdit, QWidget
+	QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QTextEdit, 
+	QWidget
 )
 from typing import Callable, Dict, List, Optional
 
@@ -142,7 +143,7 @@ class NewTermWindow(QWidget):
 				"[NewTermWindow.auto_divide] Unexpected error during auto division. \n"
 				"Error message: {}"
 			).format(str(e)))
-			raise e
+			QMessageBox.critical(self, "错误", "发生了未知错误: {}！".format(str(e)))
 		if result_list is None: 
 			return
 		valid_result_list = [
@@ -181,7 +182,21 @@ class NewTermWindow(QWidget):
 		div0 = self.div0_input.text()
 		div1 = self.div1_input.text()
 		term_type = self.type_input.currentText()
-		pri = int(self.pri_input.currentText())
+		try:
+			pri = int(self.pri_input.currentText())
+		except ValueError as e: 
+			logging.warning((
+				"[NewTermWindow.add_term] Empty input of priority and transfer to integer fails. "
+			))
+			QMessageBox.warning(self, "警告", "优先级的值不为正整数, 请检查. ")
+			return None
+		except Exception as e: 
+			logging.warning((
+				"[NewTermWindow.add_term] "
+				"Unexpected exception happenned when transfer priority the string to integet. "
+			))
+			QMessageBox.critical(self, "错误", "在转换优先级的类型的时候发生了错误: {}. ".format(str(e)))
+			return None
 		try:
 			new_term = Term(jp, kana, div0, div1, term_type, pri)
 		except ValueError as e: 
@@ -193,7 +208,8 @@ class NewTermWindow(QWidget):
 				"jp: {}, kana: {}, div0: {}, div1: {}, term_type: {}, pri: {}. \n"
 				"Error message: {}"
 			).format(jp, kana, div0, div1, term_type, pri, str(e)))
-			raise e
+			QMessageBox.critical(self, "错误", "在创建新 Term 的时候发生了未知错误: {}. ".format(e))
+			return None
 		self.info.setText("Term created successfully. ")
 		return new_term
 	
@@ -483,7 +499,9 @@ class MainWindow(QMainWindow):
 						"[MainWindow.save_func_gen] Failed to save the output text to file: {}. \n"
 						"Error message: {}"
 					).format(file_name, str(e)))
-					raise e
+					QMessageBox.critical(
+						self, "错误", "在保存文件{}的时候发生了错误: {}. ".format(file_name, str(e))
+					)
 		
 		return save_func
 
