@@ -81,7 +81,6 @@ jobs:
        - name: Build with PyInstaller
          run: |
            pyinstaller --clean \
-             --onefile \
              --windowed \
              --name="Furigana Assistant" \
              --icon="resources/icon.icns" \
