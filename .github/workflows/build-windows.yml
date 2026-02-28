@@ -103,7 +103,7 @@ jobs:
              --icon "Furigana Assistant.app" 200 150 \
              --app-drop-link 600 150 \
              --eula "LICENSE" \
-             "Furigana Assistant.dmg" \
+             "dist/Furigana Assistant.dmg" \
              "dist/"
 
        - name: Upload artifact
