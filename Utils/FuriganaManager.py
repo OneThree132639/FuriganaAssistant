@@ -399,7 +399,6 @@ class Term:
 			"来なさ": "きなさい", "来た": "きた", "来て": "きて", "来られ": "こられ", "来い": "こい", "来よ": "こよ"
 		}
 		for key, value in kahen_dic.items(): 
-			print("key: {}, value: {}".format(key, value))
 			if origin_str.startswith(key): 
 				return (
 					["来", key[1:]], [value[0], value[1:]], ["0", "-1"], origin_str[len(key):]
