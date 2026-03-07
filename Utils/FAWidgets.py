@@ -1,14 +1,20 @@
+import copy
 import logging
 import pandas as pd
 
-from PyQt5.QtCore import QEvent, QModelIndex, QObject, QSize, Qt
+from PyQt5.QtCore import (
+	QEvent, QModelIndex, QObject, QRect, QSize, Qt
+)
 from PyQt5.QtGui import (
-	QFocusEvent, QFontMetrics, QKeyEvent, QResizeEvent, 
+	QFocusEvent, QFontMetrics, QKeyEvent, QPainter, 
+	QPalette, QResizeEvent, 
 	QStandardItem, QStandardItemModel
 )
 from PyQt5.QtWidgets import (
-	QAbstractItemView, QComboBox, QGridLayout, QHeaderView, QLineEdit, 
-	QPushButton, QStyledItemDelegate, QStyleOptionViewItem, QTableView, QWidget
+	QAbstractItemView, QComboBox, QGridLayout, QHeaderView, 
+	QLineEdit, QListView,
+	QPushButton, QStyle, QStyledItemDelegate, 
+	QStyleOptionViewItem, QTableView, QWidget
 )
 from typing import Callable, Dict, Optional
 
@@ -345,6 +351,145 @@ class PopUpKeyFilter(QObject):
 			view.setCurrentIndex(model.index((current + 1) % combo.count(), 0))
 			return True
 		return False
+
+
+class FullWidthDelegate(QStyledItemDelegate): 
+
+	def __init__(self, parent: Optional[QObject] = None): 
+		super().__init__(parent)
+		self.horizontal_margin = 10
+		self.vertical_margin = 3
+		self.icon_size = 24
+		self.icon_spacing = 5
+
+		self.listView: CListView = parent # type: ignore
+		self.comboBox: CustomComboBox = self.listView.comboBox if self.listView is not None else None
+
+	def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize: 
+		value = index.data(Qt.ItemDataRole.DisplayRole)
+		text = str(value)
+		fm = QFontMetrics(option.font)
+
+		textWidth = fm.horizontalAdvance(text)
+		textHeight = fm.height()
+
+		maxWidth = textWidth if self.listView is None else self.listView.getMaxItemWidth()
+
+		width = maxWidth + 2 * self.horizontal_margin
+		height = textHeight + 2 * self.vertical_margin
+
+		if index.data(Qt.ItemDataRole.DecorationRole) is not None: 
+			width += self.icon_size + self.icon_spacing
+		
+		return QSize(width, height)
+	
+	def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None: 
+		opt = QStyleOptionViewItem(option)
+		self.initStyleOption(opt, index)
+		opt.textElideMode = Qt.TextElideMode.ElideNone
+
+		hbar = self.listView.horizontalScrollBar() if self.listView is not None else None
+		hbar_value = hbar.value() if hbar is not None else 0
+		maxWidth = self.listView.getMaxItemWidth() if self.listView is not None else opt.rect.width()
+		comboBoxWidth = self.comboBox.width() if self.comboBox is not None else 0
+
+		backRect = QRect(opt.rect)
+		backRect.setWidth(max(maxWidth, comboBoxWidth))
+		backRect.adjust(hbar_value, 0, hbar_value, 0)
+		if opt.state & QStyle.StateFlag.State_Selected: 
+			painter.fillRect(backRect, opt.palette.highlight())
+
+		cg = QPalette.ColorGroup.Normal if (opt.state & QStyle.StateFlag.State_Enabled) else QPalette.ColorGroup.Disabled
+		if opt.state & QStyle.StateFlag.State_Selected: 
+			painter.setPen(opt.palette.color(cg, QPalette.ColorRole.HighlightedText))
+		else: 
+			painter.setPen(opt.palette.color(cg, QPalette.ColorRole.Text))
+
+		textRect = QRect(opt.rect)
+		textRect.setWidth(maxWidth)
+		textRect.adjust(self.horizontal_margin, self.vertical_margin, -self.horizontal_margin, -self.vertical_margin)
+
+		if opt.icon is not None: 
+			iconRect = QRect(textRect.left() + self.horizontal_margin, textRect.top() + self.vertical_margin, self.icon_size, self.icon_size)
+			opt.icon.paint(painter, iconRect)
+			textRect.setRight(textRect.right() + self.icon_spacing)
+
+		painter.setFont(option.font)
+		painter.drawText(textRect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, opt.text)
+
+
+class CListView(QListView): 
+
+	def __init__(self, parent: Optional[QWidget] = None): 
+		super().__init__(parent)
+		self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+		self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+		self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+
+		self.setTextElideMode(Qt.TextElideMode.ElideNone)
+
+		self.setMovement(QListView.Movement.Static)
+		self.setWrapping(False)
+		self.setResizeMode(QListView.ResizeMode.Adjust)
+		viewport = self.viewport()
+		if viewport is not None: 
+			viewport.setAttribute(Qt.WidgetAttribute.WA_StaticContents)
+
+		self.maxItemWidth = 0
+
+		self.comboBox: CustomComboBox = parent
+		self.delegate = FullWidthDelegate(self)
+
+	def resetMaxItemWidth(self) -> None: 
+		self.maxItemWidth = self.recalculateMaxItemWidth()
+	
+	def getMaxItemWidth(self) -> int: 
+		return self.maxItemWidth
+	
+	def updateGeometries(self) -> None: 
+		hbar = self.horizontalScrollBar()
+		hBarValue = hbar.value() if hbar is not None else 0
+		super().updateGeometries()
+		
+		viewport = self.viewport()
+		if hbar is not None: 
+			contentWidth = self.recalculateMaxItemWidth()
+			viewportWidth = viewport.width() if viewport is not None else 0
+			hbar.setRange(0, max(0, contentWidth - viewportWidth))
+			hbar.setPageStep(viewportWidth)
+
+			hbar.setValue(hBarValue)
+
+		if viewport is not None: 
+			viewport.update()
+
+	def visualRect(self, index: QModelIndex) -> QRect: 
+		rect = super().visualRect(index)
+		if rect.isValid(): 
+			maxWidth = self.getMaxItemWidth()
+			comboBoxWidth = self.comboBox.width() if self.comboBox is not None else 0
+			rect.setWidth(max(maxWidth, comboBoxWidth))
+
+		return rect
+	
+	def recalculateMaxItemWidth(self) -> int: 
+		maxWidth = 0
+		model = self.model()
+		if model is not None: 
+			fm = QFontMetrics(self.font())
+
+			for row in range(model.rowCount()): 
+				index = model.index(row, 0)
+				text = str(index.data(Qt.ItemDataRole.DisplayRole))
+				textWidth = fm.horizontalAdvance(text)
+				itemWidth = textWidth + 2 * self.delegate.horizontal_margin
+				if index.data(Qt.ItemDataRole.DecorationRole) is not None: 
+					itemWidth += self.delegate.icon_size + self.delegate.icon_spacing
+
+				maxWidth = max(maxWidth, itemWidth)
+		
+		return maxWidth
 		
 
 class CustomComboBox(QComboBox): 
@@ -373,6 +518,17 @@ class CustomComboBox(QComboBox):
 			self.setEditable(False)
 
 		self._popup_filter_installed = False
+
+		self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+		self.listView = CListView(self)
+		self.delegate = self.listView.delegate
+		self.setView(self.listView)
+		self.setItemDelegate(self.delegate)
+
+
+		model = self.model()
+		if model is not None: 
+			model.layoutChanged.connect(self.listView.resetMaxItemWidth)
 
 
 	def keyPressEvent(self, event: QKeyEvent) -> None: 
@@ -471,7 +627,7 @@ class CustomComboBox(QComboBox):
 		self.hidePopup()
 
 	def showPopup(self) -> None: 
-		view = self.view()
+		view = self.listView
 		if view is not None: 
 			if not self._popup_filter_installed: 
 				view.installEventFilter(PopUpKeyFilter(self))
@@ -481,8 +637,19 @@ class CustomComboBox(QComboBox):
 					"Filter installed for combo: {}. "
 				).format(id(self)))
 			view.setTextElideMode(Qt.TextElideMode.ElideRight)
-		
-		super().showPopup()
+
+			super().showPopup()
+
+			view.resetMaxItemWidth()
+			popup = view.parentWidget()
+			if popup is not None: 
+				popup.setMaximumWidth(self.width())
+				popup.setMinimumWidth(self.width())
+
+				view.updateGeometry()
+
+		else: 
+			super().showPopup()
 				
 
 if __name__ == "__main__": 
