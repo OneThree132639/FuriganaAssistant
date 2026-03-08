@@ -286,73 +286,6 @@ class CustomLineEdit(QLineEdit):
 		self.on_return = func
 		self.returnPressed.connect(self.on_return)
 
-class PopUpKeyFilter(QObject): 
-
-	_installed_views = set()
-
-	def __init__(self, parent: Optional[QComboBox] = None): 
-		super().__init__(parent)
-		self.combo = parent
-		self._view_id = id(parent.view()) if parent is not None and parent.view() is not None else None
-
-		if self._view_id is not None: 
-			logging.debug((
-				"[PopUpKeyFilter] "
-				"Created for view: {}, combo: {}. "
-			).format(self._view_id, id(self.combo)))
-			if self._view_id in PopUpKeyFilter._installed_views: 
-				logging.warning((
-					"[PopUpKeyFilter] "
-					"View: {} already has a filter. "
-				).format(self._view_id))
-			PopUpKeyFilter._installed_views.add(self._view_id)
-			logging.debug((
-				"[PopUpKeyFilter] "
-				"Current _installed_views: {}"
-			).format(PopUpKeyFilter._installed_views))
-
-	def eventFilter(self, obj: QObject, event: QEvent) -> bool: 
-		if self.combo is not None and event.type() == QEvent.Type.KeyPress: 
-			key_event = QKeyEvent(event) # type: ignore
-			key = key_event.key()
-			if key in (Qt.Key.Key_Up, Qt.Key.Key_Down): 
-				self.handle_direction_key(self.combo, Qt.Key(key))
-				return True
-		return super().eventFilter(obj, event)
-
-	def handle_direction_key(self, combo: QComboBox, key: Qt.Key) -> bool: 
-		view = combo.view()
-		if view is None or not view.isVisible(): 
-			return False
-		current = view.currentIndex().row()
-		model = view.model()
-		if model is None: 
-			return False
-		if current < 0:
-			current = 0
-		if combo.count() == 0: 
-			logging.warning((
-				"[PopUpKeyFilter] "
-				"No items in combo, filtered. "
-			))
-			return False
-		if key == Qt.Key.Key_Up: 
-			logging.debug((
-				"[PopUpKeyFilter] [Qt.Key.KeyUp] Id: {}. "
-				"From {} to {}. "
-			).format(self._view_id, current, (current - 1) % combo.count()))
-			view.setCurrentIndex(model.index((current - 1) % combo.count(), 0))
-			return True
-		elif key == Qt.Key.Key_Down: 
-			logging.debug((
-				"[PopUpKeyFilter] [Qt.Key.KeyDown] Id: {}. "
-				"From {} to {}. "
-			).format(self._view_id, current, (current + 1) % combo.count()))
-			view.setCurrentIndex(model.index((current + 1) % combo.count(), 0))
-			return True
-		return False
-
-
 class FullWidthDelegate(QStyledItemDelegate): 
 
 	def __init__(self, parent: Optional[QObject] = None): 
@@ -441,6 +374,8 @@ class CListView(QListView):
 		self.comboBox: CustomComboBox = parent
 		self.delegate = FullWidthDelegate(self)
 
+		self.keyScrollStep = 20
+
 	def resetMaxItemWidth(self) -> None: 
 		self.maxItemWidth = self.recalculateMaxItemWidth()
 	
@@ -490,7 +425,38 @@ class CListView(QListView):
 				maxWidth = max(maxWidth, itemWidth)
 		
 		return maxWidth
-		
+	
+	def keyPressEvent(self, event: QKeyEvent) -> None: 
+		combo = self.comboBox
+		if combo is not None: 
+			model = self.model()
+			if model is not None:
+				if event.key() == Qt.Key.Key_Up: 
+					self.setCurrentIndex(model.index((self.currentIndex().row() - 1) % combo.count(), 0))
+					return
+				elif event.key() == Qt.Key.Key_Down: 
+					self.setCurrentIndex(model.index((self.currentIndex().row() + 1) % combo.count(), 0))
+					return
+				elif event.key() == Qt.Key.Key_Left: 
+					logging.info((
+						"[CListView.keyPressEvent] [Key_Left] pressed. "
+					))
+					hbar = self.horizontalScrollBar()
+					if hbar is not None:
+						hbar.setValue(max(hbar.minimum(), hbar.value() - self.keyScrollStep))
+					event.accept()
+					return
+				elif event.key() == Qt.Key.Key_Right: 
+					logging.info((
+						"[CListView.keyPressEvent] [Key_Right] pressed. "
+					))
+					hbar = self.horizontalScrollBar()
+					if hbar is not None:
+						hbar.setValue(min(hbar.maximum(), hbar.value() + self.keyScrollStep))
+					event.accept()
+					return
+		super().keyPressEvent(event)
+
 
 class CustomComboBox(QComboBox): 
 
@@ -516,8 +482,6 @@ class CustomComboBox(QComboBox):
 				line_edit.installEventFilter(self)
 		else: 
 			self.setEditable(False)
-
-		self._popup_filter_installed = False
 
 		self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
 		self.listView = CListView(self)
@@ -629,15 +593,6 @@ class CustomComboBox(QComboBox):
 	def showPopup(self) -> None: 
 		view = self.listView
 		if view is not None: 
-			if not self._popup_filter_installed: 
-				view.installEventFilter(PopUpKeyFilter(self))
-				self._popup_filter_installed = True
-				logging.debug((
-					"[CustomComboBox.showPopUp] "
-					"Filter installed for combo: {}. "
-				).format(id(self)))
-			view.setTextElideMode(Qt.TextElideMode.ElideRight)
-
 			super().showPopup()
 
 			view.resetMaxItemWidth()
