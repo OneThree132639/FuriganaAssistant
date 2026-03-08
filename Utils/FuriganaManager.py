@@ -1027,16 +1027,28 @@ class Dictionary:
 	def __len__(self) -> int: 
 		return len(self.dic)
 	
-	def find(self, part: str) -> "Dictionary": 
+	def find(self, part: str, label: str) -> "Dictionary": 
 		result_df = self.dic.copy()
-		result_df["in_jp_no_seps"] = result_df["Japanese"].apply(
-			lambda x: part in Term.remove_seps(x)
-		)
-		result_df["in_kana_no_seps"] = result_df["Kana"].apply(
-			lambda x: part in Term.remove_seps(x)
-		)
-		result_df = result_df[result_df["in_jp_no_seps"] | result_df["in_kana_no_seps"]]
-		result_df.drop(["in_jp_no_seps", "in_kana_no_seps"], axis=1, inplace=True)
+		match label: 
+			case "Japanese" | "Kana" as caught:
+				result_df["in_no_seps"] = result_df[caught].apply(
+					lambda x: part in Term.remove_seps(x)
+				)
+				result_df = result_df[result_df["in_no_seps"]]
+				result_df.drop(["in_no_seps"], axis=1, inplace=True)
+			case "Division0" | "Division1" | "Type" as caught: 
+				result_df["in"] = result_df[caught].apply(lambda x: part in x)
+				result_df = result_df[result_df["in"]]
+				result_df.drop(["in"], axis=1, inplace=True)
+			case "Priority": 
+				result_df["in"] = result_df["Priority"].apply(lambda x: str(x) == part)
+				result_df = result_df[result_df["in"]]
+				result_df.drop(["in"], axis=1, inplace=True)
+			case _: 
+				raise ValueError((
+					"[Dictionary.find] "
+					"Invalid label: {}. "
+				).format(label))
 		new_dic = Dictionary(self.dic_path)
 		new_dic.update(result_df)
 		return new_dic

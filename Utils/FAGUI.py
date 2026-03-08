@@ -5,6 +5,7 @@ import pandas as pd
 import sys
 
 from pathlib import Path
+from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (
 	QAction, QApplication, QComboBox, QFileDialog, QGridLayout, QLabel, 
 	QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QTextEdit, 
@@ -30,7 +31,8 @@ class FindWindow(QWidget):
 		self.part_input = CustomLineEdit(0, 0, 
 			"Please enter the part to find. ", self._nav_manager, self
 		)
-		self.find_button = CustomButton(0, 1, "Find", self._nav_manager, self)
+		self.label_comboBox = CustomComboBox(0, 1, False, "", self._nav_manager, self)
+		self.find_button = CustomButton(0, 2, "Find", self._nav_manager, self)
 		self.del_index_box = CustomLineEdit(1, 0, 
 			"Please enter the ID to delete. ", self._nav_manager, self
 		)
@@ -41,21 +43,30 @@ class FindWindow(QWidget):
 		self.info.setReadOnly(True)
 
 		layout.addWidget(self.part_input, 0, 0)
-		layout.addWidget(self.find_button, 0, 1)
-		layout.addWidget(self.del_index_box, 1, 0)
-		layout.addWidget(self.del_button, 1, 1)
+		layout.addWidget(self.label_comboBox, 0, 1)
+		layout.addWidget(self.find_button, 0, 2)
+		layout.addWidget(self.del_index_box, 1, 0, 1, 2)
+		layout.addWidget(self.del_button, 1, 2)
 		layout.addWidget(self.dic_viewer, 2, 0, 2, 2)
 		layout.addWidget(self.info, 4, 0, 1, 2)
 		self.setLayout(layout)
 
 		self.part_input.set_on_return(self.find_func)
+		self.label_comboBox.addItems(
+			["Japanese", "Kana", "Division0", "Division1", "Type", "Priority"]
+		)
+		self.label_comboBox.setMinimumWidth(
+			self.label_comboBox.listView.maxItemWidth + 100
+		)
 		self.find_button.set_on_click(self.find_func)
 		self.del_index_box.set_on_return(self.del_func)
+		self.del_index_box.setValidator(QIntValidator(0, 2, self.del_index_box))
 		self.del_button.set_on_click(self.del_func)
 
 	def find_func(self) -> None: 
+		label = self.label_comboBox.currentText()
 		part = self.part_input.text()
-		self.dic_viewer.find_view(part)
+		self.dic_viewer.find_view(part, label)
 
 	def del_func(self) -> None: 
 		index = self.del_index_box.text()

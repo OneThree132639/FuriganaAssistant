@@ -121,8 +121,8 @@ class DicViewer(QWidget):
 		else: 
 			return False
 		
-	def find_view(self, part: str) -> None: 
-		self.current_dic = self.dic.find(part)
+	def find_view(self, part: str, label: str) -> None: 
+		self.current_dic = self.dic.find(part, label)
 		self.model.update_by_Dictionary(self.current_dic)
 
 	def save(self) -> None: 
