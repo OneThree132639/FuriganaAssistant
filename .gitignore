@@ -39,3 +39,4 @@ env/
 build_dmg.sh
 dmg/
 test_folder/
+resources/example_docx

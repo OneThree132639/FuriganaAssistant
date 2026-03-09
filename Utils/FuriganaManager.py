@@ -910,7 +910,7 @@ class Dictionary:
 			priority_pattern = Dictionary.PATTERNS["priority"]
 			custom_result = re.match(custom_pattern, remaining_line)
 			priority_result = re.match(priority_pattern, remaining_line)
-			if remaining_line[:2] in ["$$", "((", "))", "[[", "]]"]: 
+			if remaining_line[:2] in ("$$", "$(", "$)", "$[", "$]", "$#"): 
 				remaining_line = remaining_line[1:]
 			elif custom_result is not None:	
 				args = [custom_result.group(i) for i in range(1, 5)]
@@ -924,12 +924,12 @@ class Dictionary:
 			elif priority_result is not None: 
 				priority = int(priority_result.group(1))
 				remaining_line = priority_result.group(2)
-			elif remaining_line[0] == "$": 
+			elif remaining_line[0] == "#": 
 				remaining_line = remaining_line[1:]
-				while len(remaining_line) > 0 and remaining_line[0] != "$": 
+				while len(remaining_line) > 0 and remaining_line[0] != "#": 
 					tokens.append(Token0(remaining_line[0]))
 					remaining_line = remaining_line[1:]
-				if len(remaining_line) > 0 and remaining_line[0] == "$": 
+				if len(remaining_line) > 0 and remaining_line[0] == "#": 
 					remaining_line = remaining_line[1:]
 				continue
 			found, new_tokens, remaining_line = self.search_to_token0(remaining_line, priority)
@@ -950,7 +950,7 @@ class Dictionary:
 			priority_pattern = Dictionary.PATTERNS["priority"]
 			custom_result = re.match(custom_pattern, remaining_line)
 			priority_result = re.match(priority_pattern, remaining_line)
-			if remaining_line[:2] in ["$$", "((", "))", "[[", "]]"]: 
+			if remaining_line[:2] in ("$$", "$(", "$)", "$[", "$]", "$#"): 
 				remaining_line = remaining_line[1:]
 			elif custom_result is not None:	
 				args = [custom_result.group(i) for i in range(1, 5)]
@@ -964,12 +964,12 @@ class Dictionary:
 			elif priority_result is not None: 
 				priority = int(priority_result.group(1))
 				remaining_line = priority_result.group(2)
-			elif remaining_line[0] == "$": 
+			elif remaining_line[0] == "#": 
 				remaining_line = remaining_line[1:]
-				while len(remaining_line) > 0 and remaining_line[0] != "$": 
+				while len(remaining_line) > 0 and remaining_line[0] != "#": 
 					tokens.append(Token1(remaining_line[0]))
 					remaining_line = remaining_line[1:]
-				if len(remaining_line) > 0 and remaining_line[0] == "$": 
+				if len(remaining_line) > 0 and remaining_line[0] == "#": 
 					remaining_line = remaining_line[1:]
 				continue
 			found, new_tokens, remaining_line = self.search_to_token1(remaining_line, priority)
@@ -990,7 +990,7 @@ class Dictionary:
 			priority_pattern = Dictionary.PATTERNS["priority"]
 			custom_result = re.match(custom_pattern, remaining_line)
 			priority_result = re.match(priority_pattern, remaining_line)
-			if remaining_line[:2] in ["$$", "((", "))", "[[", "]]"]: 
+			if remaining_line[:2] in ("$$", "$(", "$)", "$[", "$]", "$#"): 
 				remaining_line = remaining_line[1:]
 			elif custom_result is not None:	
 				args = [custom_result.group(i) for i in range(1, 5)]
@@ -1007,12 +1007,12 @@ class Dictionary:
 			elif priority_result is not None: 
 				priority = int(priority_result.group(1))
 				remaining_line = priority_result.group(2)
-			elif remaining_line[0] == "$": 
+			elif remaining_line[0] == "#": 
 				remaining_line = remaining_line[1:]
-				while len(remaining_line) > 0 and remaining_line[0] != "$": 
+				while len(remaining_line) > 0 and remaining_line[0] != "#": 
 					tokens.append(Token2(remaining_line[0], None, True))
 					remaining_line = remaining_line[1:]
-				if len(remaining_line) > 0 and remaining_line[0] == "$": 
+				if len(remaining_line) > 0 and remaining_line[0] == "#": 
 					remaining_line = remaining_line[1:]
 				continue
 			found, new_tokens, remaining_line = self.search_to_token2(remaining_line, priority)

@@ -60,7 +60,7 @@ class FindWindow(QWidget):
 		)
 		self.find_button.set_on_click(self.find_func)
 		self.del_index_box.set_on_return(self.del_func)
-		self.del_index_box.setValidator(QIntValidator(0, 2, self.del_index_box))
+		self.del_index_box.setValidator(QIntValidator(0, 2147483647, self.del_index_box))
 		self.del_button.set_on_click(self.del_func)
 
 	def find_func(self) -> None: 
