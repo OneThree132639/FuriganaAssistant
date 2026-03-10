@@ -8,7 +8,8 @@ from pathlib import Path
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (
 	QAction, QApplication, QFileDialog, QGridLayout, 
-	QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QTextEdit, 
+	QMainWindow, QMenu, QMessageBox, QPushButton, QSizePolicy, 
+	QStackedWidget, QTextEdit, 
 	QWidget
 )
 from typing import Callable, Dict, List, Optional
@@ -47,9 +48,24 @@ class FindWindow(QWidget):
 		layout.addWidget(self.find_button, 0, 2)
 		layout.addWidget(self.del_index_box, 1, 0, 1, 2)
 		layout.addWidget(self.del_button, 1, 2)
-		layout.addWidget(self.dic_viewer, 2, 0, 2, 2)
-		layout.addWidget(self.info, 4, 0, 1, 2)
+		layout.addWidget(self.dic_viewer, 2, 0, 2, 3)
+		layout.addWidget(self.info, 4, 0, 1, 3)
 		self.setLayout(layout)
+
+		self.part_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+		self.label_comboBox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+		self.find_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+		self.del_index_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+		self.del_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+		self.dic_viewer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+		self.info.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+		layout.setRowStretch(0, 0)
+		layout.setRowStretch(1, 0)
+		layout.setRowStretch(2, 3)
+		layout.setRowStretch(3, 3)
+		layout.setRowStretch(4, 1)
+
 
 		self.part_input.set_on_return(self.find_func)
 		self.label_comboBox.addItems(
