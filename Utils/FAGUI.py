@@ -7,14 +7,14 @@ import sys
 from pathlib import Path
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (
-	QAction, QApplication, QComboBox, QFileDialog, QGridLayout, QLabel, 
+	QAction, QApplication, QFileDialog, QGridLayout, 
 	QMainWindow, QMenu, QMessageBox, QPushButton, QStackedWidget, QTextEdit, 
 	QWidget
 )
 from typing import Callable, Dict, List, Optional
 
 from Utils.DocxGenerator import DocxGenerator
-from Utils.FAWidgets import CustomButton, CustomComboBox, CustomLineEdit, DicViewer
+from Utils.FAWidgets import CustomButton, CustomComboBox, CustomLineEdit, DicViewer, HelperWindow
 from Utils.FontManager import FontSettingsWindow
 from Utils.FuriganaManager import (
 	AutoDivisionChoiceOverflowError, AutoDivisionDisabledError, Term, Token0, Token1, Token2
@@ -234,15 +234,16 @@ class NewTermWindow(QWidget):
 class MainWindow(QMainWindow): 
 
 	def __init__(self, 
-			dic_path: str, text_path: str, json_path: str, 
+			config_dir: str, resource_dir: str, 
 			parent: Optional[QWidget] = None
 		): 
 		super().__init__(parent)
 		self.setWindowTitle("Furigana Adding Tool")
 		self.resize(800, 600)
 
-		self.text_path = text_path
-		self.json_path = json_path
+		self.text_path = os.path.join(config_dir, "text.txt")
+		self.json_path = os.path.join(config_dir, "config.json")
+		self.html_path = os.path.join(resource_dir, "help.html")
 
 		main_widget = QWidget(self)
 		layout = QGridLayout(main_widget)
@@ -259,7 +260,7 @@ class MainWindow(QMainWindow):
 		layout.addLayout(self.window_switch_button_layout, 0, 0)
 		layout.addWidget(self.stacked_widget, 1, 0, 4, 1)
 
-		self.find_window = FindWindow(dic_path, self)
+		self.find_window = FindWindow(os.path.join(config_dir, "dic.csv"), self)
 		self.viewer_new_term_window = NewTermWindow(self)
 		self.input_text_edit = QTextEdit("", self)
 		self.output_text_edit = QTextEdit("", self)
@@ -270,6 +271,7 @@ class MainWindow(QMainWindow):
 			int(self.get_config("last_columns")) if self.get_config("last_columns").isdigit() else None, 
 			self
 		)
+		self.helper_window = None
 
 		self.add_page(0, 0, self.viewer_page_button, self.viewer_page())
 		self.add_page(0, 1, self.input_page_button, self.input_page())
@@ -315,6 +317,12 @@ class MainWindow(QMainWindow):
 				self._add_action(
 					file_menu, "Merge new dic", "Ctrl+M", 
 					"Merge a data file into current local datas. ", self.merge
+				)
+			help_menu = menu_bar.addMenu("&Help")
+			if help_menu is not None: 
+				self._add_action(
+					help_menu, "Help", "", 
+					"Show help message. ", self.show_helper
 				)
 
 	def _add_action(self, 
@@ -609,6 +617,12 @@ class MainWindow(QMainWindow):
 					"[MainWindow.merge_csv] Unexpected error happenned: {} "
 					"while read data file: {}. "
 				).format(str(e)), file_path)
+
+	def show_helper(self) -> None: 
+		if self.helper_window is None: 
+			self.helper_window = HelperWindow(self.html_path, self)
+			self.helper_window.destroyed.connect(lambda: setattr(self, "helper_window", None))
+		self.helper_window.show()
 				
 
 			
@@ -623,9 +637,8 @@ if __name__ == "__main__":
 	DIRPATH = os.path.dirname(os.path.abspath(__file__))
 	app = QApplication(sys.argv)
 	window = MainWindow(
-		os.path.join(DIRPATH, "..", "src", "dictionary_test.csv"), 
-		os.path.join(DIRPATH, "..", "src", "input_test.txt"), 
-		os.path.join(DIRPATH, "..", "src", "config.json")
+		os.path.join(DIRPATH, "..", "test_folder", "src"), 
+		os.path.join(DIRPATH, "..", "resources")
 	)
 	window.show()
 	sys.exit(app.exec_())

@@ -16,9 +16,16 @@ def get_config_dir(app_name: str) -> Path:
 	else: 
 		return Path.home() / ".config" / app_name
 	
+def get_resource_path() -> str: 
+	try: 
+		return sys._MEIPASS # type: ignore
+	except Exception: 
+		return os.path.dirname(os.path.abspath(__file__))
+
+	
 if __name__ == "__main__": 
 
-	DIRPATH = os.path.dirname(os.path.realpath(__file__))
+	resource_dir = os.path.join(get_resource_path(), "resources")
 	
 	logging.basicConfig(
 		level=logging.INFO, 
@@ -30,9 +37,7 @@ if __name__ == "__main__":
 	config_dir.mkdir(parents=True, exist_ok=True)
 	app = QApplication(sys.argv)
 	window = MainWindow(
-		os.path.join(config_dir, "dic.csv"), 
-		os.path.join(config_dir, "text.txt"), 
-		os.path.join(config_dir, "config.json"), 
+		str(config_dir), resource_dir
 	)
 	window.show()
 	sys.exit(app.exec_())

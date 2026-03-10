@@ -11,4 +11,5 @@ pandas
 
 # docx
 lxml
+markdown
 python-docx

@@ -40,6 +40,7 @@ jobs:
             --windowed `
             --name="Furigana Assistant" `
             --icon="resources/favicon.ico" `
+            --add-data "resources;resources" `
             main.py
 
       - name: Upload artifact
@@ -84,6 +85,7 @@ jobs:
              --windowed \
              --name="Furigana Assistant" \
              --icon="resources/icon.icns" \
+             --add-data "resources:resources" \
              main.py
 
        - name: Install create-dmg

@@ -1,9 +1,10 @@
-import copy
 import logging
+import markdown
+import os
 import pandas as pd
 
 from PyQt5.QtCore import (
-	QEvent, QModelIndex, QObject, QRect, QSize, Qt
+	QModelIndex, QObject, QRect, QSize, Qt
 )
 from PyQt5.QtGui import (
 	QFocusEvent, QFontMetrics, QKeyEvent, QPainter, 
@@ -11,10 +12,10 @@ from PyQt5.QtGui import (
 	QStandardItem, QStandardItemModel
 )
 from PyQt5.QtWidgets import (
-	QAbstractItemView, QComboBox, QGridLayout, QHeaderView, 
-	QLineEdit, QListView,
+	QAbstractItemView, QComboBox, QDialog, QGridLayout, QHeaderView, 
+	QLineEdit, QListView, QMessageBox, 
 	QPushButton, QStyle, QStyledItemDelegate, 
-	QStyleOptionViewItem, QTableView, QWidget
+	QStyleOptionViewItem, QTableView, QTextBrowser, QWidget
 )
 from typing import Callable, Dict, Optional
 
@@ -605,7 +606,51 @@ class CustomComboBox(QComboBox):
 
 		else: 
 			super().showPopup()
-				
+
+class HelperWindow(QDialog): 
+
+	def __init__(self, html_path: str, parent: Optional[QWidget] = None): 
+		super().__init__(parent)
+		self.setWindowTitle("Help")
+		self.resize(600, 400)
+
+		self.text_browser = QTextBrowser(self)
+
+		self.ok_button = QPushButton("OK", self)
+		self.ok_button.clicked.connect(self.accept)
+
+		layout = QGridLayout(self)
+		layout.addWidget(self.text_browser, 0, 0, 5, 5)
+		layout.addWidget(self.ok_button, 5, 4, 1, 1, Qt.AlignmentFlag.AlignRight)
+		self.setLayout(layout)
+
+		self.set_html(html_path)
+
+
+	def read_md(self, html_path: str) -> Optional[str]: 
+		if os.path.exists(html_path) and os.path.splitext(html_path)[1].lower() == ".html": 
+			try: 
+				with open(html_path, "r", encoding="utf-8") as f: 
+					return f.read()
+			except Exception as e: 
+				msg = (
+					"[HelperWindow.read_md] Unexpected error happened when reading html file: {}, error: {}"
+				).format(html_path, str(e))
+				logging.error(msg)
+				QMessageBox.critical(self, "Error", msg)
+				return None
+		else: 
+			msg = (
+				"[HelperWindow.read_md] File not found or not a html file: {}"
+			).format(html_path)
+			logging.error(msg)
+			QMessageBox.critical(self, "Error", msg)
+			return None
+		
+	def set_html(self, html_path: str) -> None: 
+		html_content = self.read_md(html_path)
+		if html_content is not None: 
+			self.text_browser.setHtml(html_content)
 
 if __name__ == "__main__": 
 	pass
