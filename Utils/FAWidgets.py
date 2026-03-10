@@ -4,10 +4,10 @@ import os
 import pandas as pd
 
 from PyQt5.QtCore import (
-	QModelIndex, QObject, QRect, QSize, Qt
+	QModelIndex, QObject, QRect, QSize, Qt, QUrl
 )
 from PyQt5.QtGui import (
-	QFocusEvent, QFontMetrics, QKeyEvent, QPainter, 
+	QDesktopServices, QFocusEvent, QFontMetrics, QKeyEvent, QPainter, 
 	QPalette, QResizeEvent, 
 	QStandardItem, QStandardItemModel
 )
@@ -607,6 +607,65 @@ class CustomComboBox(QComboBox):
 		else: 
 			super().showPopup()
 
+class HybridTextBrowser(QTextBrowser): 
+
+	def __init__(self, parent: Optional[QWidget] = None): 
+		super().__init__(parent)
+		self.setOpenLinks(False)
+		self.setOpenExternalLinks(False)
+		self.anchorClicked.connect(self.handle_link_click)
+		
+	def handle_link_click(self, url: QUrl) -> None: 
+		if not url.isValid(): 
+			logging.warning((
+				"[HybridTextBrowser.handle_link_click] Invalid URL: {}. "
+			).format(url.toString()))
+			return
+		
+		scheme = url.scheme()
+		path = url.path()
+		fragment = url.fragment()
+
+		if scheme == "" and fragment != "": 
+			logging.info((
+				"[HybridTextBrowser.handle_link_click] Fragment link clicked: {}. "
+			).format(url.toString()))
+			super().setSource(url)
+			return
+		
+		if scheme == "": 
+			logging.info((
+				"[HybridTextBrowser.handle_link_click] Local link clicked: {}. "
+			).format(url.toString()))
+			super().setSource(url)
+			return
+		
+		if scheme == "file": 
+			logging.info((
+				"[HybridTextBrowser.handle_link_click] File link clicked: {}. "
+			).format(url.toString()))
+			super().setSource(url)
+			return
+		
+		if scheme in ("http", "https"): 
+			logging.info((
+				"[HybridTextBrowser.handle_link_click] Web link clicked: {}. "
+			).format(url.toString()))
+			QDesktopServices.openUrl(url)
+			return
+		
+		if scheme in ("mailto", "ftp", "tel"): 
+			logging.info((
+				"[HybridTextBrowser.handle_link_click] External link clicked: {}. "
+			).format(url.toString()))
+			QDesktopServices.openUrl(url)
+			return
+		
+		logging.warning((
+			"[HybridTextBrowser.handle_link_click] Unknown link clicked: {}. "
+		).format(url.toString()))
+		super().setSource(url)
+
 class HelperWindow(QDialog): 
 
 	def __init__(self, html_path: str, parent: Optional[QWidget] = None): 
@@ -614,7 +673,7 @@ class HelperWindow(QDialog):
 		self.setWindowTitle("Help")
 		self.resize(600, 400)
 
-		self.text_browser = QTextBrowser(self)
+		self.text_browser = HybridTextBrowser(self)
 
 		self.ok_button = QPushButton("OK", self)
 		self.ok_button.clicked.connect(self.accept)
@@ -651,6 +710,7 @@ class HelperWindow(QDialog):
 		html_content = self.read_md(html_path)
 		if html_content is not None: 
 			self.text_browser.setHtml(html_content)
+
 
 if __name__ == "__main__": 
 	pass
