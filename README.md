@@ -21,7 +21,7 @@
 
 ## 安装方法
 
-访问[Github Release](https://github.com/OneThree132639/FuriganaAssistant/releases/tag/v1.0.7)
+访问[Github Release](https://github.com/OneThree132639/FuriganaAssistant/releases/tag/v1.0.10)
  - `Windows`用户请下载`FuriganaAssistant.exe`文件, 下载之后可以直接运行. 
  - `MacOS`用户请下载`FuriganaAssistant.dmg`文件, 打开文件之后拖动其中的`FuriganaAssistant.app`到`应用程序(Application)`文件夹, 即可作为应用程序使用. 
 
